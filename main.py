@@ -1,5 +1,6 @@
+import csv
 import random
-
+import time
 import numpy as np
 import evaluate_functions as eval_strategy
 import copy
@@ -428,16 +429,19 @@ def agent_name_from_index(playerNumber, agents, layers):
     return name
 
 
-def play(agents, layers):
+def play(agents, layers, display):
     board = create_board()
     global currentPlayer
     player = 1
     end_game = False
+    time_between_turns = []
 
     while not end_game:
+        if player == 1:
+            start = time.time()
         if agents[player - 1] == 0:
             column = int(input("Joueur " + str(player) + ", choisissez une colonne : ")) - 1
-            while column < 0 or column > columns-1:
+            while column < 0 or column > columns - 1:
                 column = int(input("Joueur " + str(player) + ", choisissez une colonne : ")) - 1
             if not place_token(board, column, player):
                 move = False
@@ -450,9 +454,13 @@ def play(agents, layers):
             else:
                 board = get_mcts_move(board, player, layers[player - 1])
             move = True
+        if player == 1:
+            end = time.time()
+            time_between_turns.append(end - start)
 
-        print(agent_name_from_index(player, agents, layers))
-        display_grid(board)
+        if display:
+            print(agent_name_from_index(player, agents, layers))
+            display_grid(board)
 
         if move:
             if check_victory(board, player):
@@ -460,6 +468,7 @@ def play(agents, layers):
                 print("Joueur " + str(player) + " a gagné !")
                 print(bcolors.ENDC)
                 end_game = True
+                winner = player
             elif len(get_valid_columns(board)) == 0:
                 print("Match nul !")
                 end_game = True
@@ -468,6 +477,7 @@ def play(agents, layers):
                 currentPlayer = player
         else:
             print("La colonne est pleine. Veuillez choisir une autre colonne.")
+    return time_between_turns, winner
 
 
 def main():
@@ -494,8 +504,6 @@ def main():
     if agent2 == 3:
         layer2 = int(input("Profondeur MCTS IA 2 (entre 500 et 20000): "))
 
-    play([agent1, agent2], [layer1, layer2])
-
 
 # Stratégie - 0: Agressive |  1: Modérée |  2: Défensive
 # Premier paramètre
@@ -505,6 +513,22 @@ def main():
 # 3: MCTS
 # Deuxième paramètre = nombre de couche
 
-main()
-#strategy = [2, 2]
-#play([2, 3], [3, 1])
+# main()
+strategy = [0, 2]
+time_infos = []
+winners = 0
+for i in range(1):
+    reponse, gagnant = play([1, 2], [2, 3], True)
+    time_infos.append(reponse)
+    if gagnant == 1:
+        winners += 1
+
+sums = []
+for i in range(len(time_infos)):
+    somme = 0
+    for j in range(len(time_infos[i])):
+        somme += time_infos[i][j]
+    sums.append(somme)
+
+print("Pourcentage de victoire : ", winners / 10 * 100)
+print("Temps moyen : ", sum(sums) / len(sums))
