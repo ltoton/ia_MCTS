@@ -1,15 +1,19 @@
+import random
+
 import numpy as np
 import evaluate_functions as eval_strategy
-import random
+import copy
+import math
 
 ##### Variables #####
 lignes = 6
 colonnes = 7
 strategy = [0, 0]
 currentPlayer = 1
-
-
 #####################
+
+dx = [1, 1, 1, 0]
+dy = [1, 0, -1, 1]
 
 
 class bcolors:
@@ -17,67 +21,190 @@ class bcolors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
-class Node:
-    def __init__(self, state):
+
+class Board(object):
+
+    def __init__(self, board, last_move=[None, None]):
+        self.board = board
+        self.last_move = last_move
+
+    def tryMove(self, move):
+        # Takes the current board and a possible move specified
+        # by the column. Returns the appropiate row where the
+        # piece and be located. If it's not found it returns -1.
+
+        if (move < 0 or move > 7 or self.board[0][move] != 0):
+            return -1;
+
+        for i in range(len(self.board)):
+            if (self.board[i][move] != 0):
+                return i - 1
+        return len(self.board) - 1
+
+    def terminal(self):
+        # Returns true when the game is finished, otherwise false.
+        for i in range(len(self.board[0])):
+            if (self.board[0][i] == 0):
+                return False
+        return True
+
+    def legal_moves(self):
+        # Returns the full list of legal moves that for next player.
+        legal = []
+        for i in range(len(self.board[0])):
+            if (self.board[0][i] == 0):
+                legal.append(i)
+
+        return legal
+
+    def next_state(self, turn):
+        # Retuns next state
+        aux = copy.deepcopy(self)
+        moves = aux.legal_moves()
+        if len(moves) > 0:
+            ind = random.randint(0, len(moves) - 1)
+            row = aux.tryMove(moves[ind])
+            aux.board[row][moves[ind]] = turn
+            aux.last_move = [row, moves[ind]]
+        return aux
+
+    def winner(self):
+        # Takes the board as input and determines if there is a winner.
+        # If the game has a winner, it returns the player number (Computer = 1, Human = -1).
+        # If the game is still ongoing, it returns zero.
+
+        x = self.last_move[0]
+        y = self.last_move[1]
+
+        if x == None:
+            return 0
+
+        for d in range(4):
+
+            h_counter = 0
+            c_counter = 0
+
+            for k in range(-3, 4):
+
+                u = x + k * dx[d]
+                v = y + k * dy[d]
+
+                if u < 0 or u >= 6:
+                    continue
+
+                if v < 0 or v >= 7:
+                    continue
+
+                if self.board[u][v] == -1:
+                    c_counter = 0
+                    h_counter += 1
+                elif self.board[u][v] == 1:
+                    h_counter = 0
+                    c_counter += 1
+                else:
+                    h_counter = 0
+                    c_counter = 0
+
+                if h_counter == 4:
+                    return -1
+
+                if c_counter == 4:
+                    return 1
+
+        return 0
+
+
+class Node():
+    # Data structure to keep track of our search
+    def __init__(self, state, parent=None):
+        self.visits = 1
+        self.reward = 0.0
         self.state = state
-        self.parent = None
         self.children = []
-        self.visits = 0
-        self.simulation_reward = 0
+        self.children_move = []
+        self.parent = parent
+
+    def addChild(self, child_state, move):
+        child = Node(child_state, self)
+        self.children.append(child)
+        self.children_move.append(move)
+
+    def update(self, reward):
+        self.reward += reward
+        self.visits += 1
+
+    def fully_explored(self):
+        if len(self.children) == len(self.state.legal_moves()):
+            return True
+        return False
 
 
-def selection(node):
-    while node.children:
-        if not all(child.visits for child in node.children):
-            return expansion(node)
-        node = max(node.children, key=ucb1)
-    return node
+def MTCS(maxIter, root, factor):
+    for inter in range(maxIter):
+        front, turn = treePolicy(root, 1, factor)
+        reward = defaultPolicy(front.state, turn)
+        backup(front, reward, turn)
+
+    ans = bestChild(root, 0)
+    # print [(c.reward/c.visits) for c in ans.parent.children ]
+    return ans
 
 
-def ucb1(node):
-    exploitation = node.simulation_reward / node.visits
-    exploration = np.sqrt(2 * np.log(node.parent.visits) / node.visits)
-    return exploitation + exploration
+def treePolicy(node, turn, factor):
+    while node.state.terminal() == False and node.state.winner() == 0:
+        if (node.fully_explored() == False):
+            return expand(node, turn), -turn
+        else:
+            node = bestChild(node, factor)
+            turn *= -1
+    return node, turn
 
 
-def expansion(node):
-    possible_moves = get_colonnes_valides(node.state)
+def expand(node, turn):
+    tried_children_move = [m for m in node.children_move]
+    possible_moves = node.state.legal_moves()
+
     for move in possible_moves:
-        new_state = make_move(node.state, move)
-        new_node = Node(new_state)
-        new_node.parent = node
-        node.children.append(new_node)
-    return random.choice(node.children)
+        if move not in tried_children_move:
+            row = node.state.tryMove(move)
+            new_state = copy.deepcopy(node.state)
+            new_state.board[row][move] = turn
+            new_state.last_move = [row, move]
+            break
+
+    node.addChild(new_state, move)
+    return node.children[-1]
 
 
-def simulation(node):
-    state = node.state
-    while not verifie_victoire(state, 1) and not verifie_victoire(state, 2) and not grille_pleine(state):
-        move = random.choice(get_colonnes_valides(state))
-        state = make_move(state, move)
-    winner = get_winner(state)
-    if winner == 1:
-        node.simulation_reward += 1
-    elif winner == 2:
-        node.simulation_reward -= 1
+def bestChild(node, factor):
+    bestscore = -10000000.0
+    bestChildren = []
+    for c in node.children:
+        exploit = c.reward / c.visits
+        explore = math.sqrt(math.log(2.0 * node.visits) / float(c.visits))
+        score = exploit + factor * explore
+        if score == bestscore:
+            bestChildren.append(c)
+        if score > bestscore:
+            bestChildren = [c]
+            bestscore = score
+    return random.choice(bestChildren)
 
 
-def mise_a_jour(node):
-    while node is not None:
+def defaultPolicy(state, turn):
+    while state.terminal() == False and state.winner() == 0:
+        state = state.next_state(turn)
+        turn *= -1
+    return state.winner()
+
+
+def backup(node, reward, turn):
+    while node != None:
         node.visits += 1
-        node.simulation_reward += node.parent.simulation_reward
+        node.reward -= turn * reward
         node = node.parent
-
-
-def mcts(plateau, iterations):
-    root = Node(plateau.copy())
-    for _ in range(iterations):
-        selected_node = selection(root)
-        expansion(selected_node)
-        node_to_simulate = selected_node.children[-1]
-        simulation(node_to_simulate)
-        mise_a_jour(node_to_simulate)
-    return max(root.children, key=lambda x: x.visits)
+        turn *= -1
+    return
 
 
 ################ Gestion du jeu ##################
@@ -86,6 +213,14 @@ def mcts(plateau, iterations):
 def creer_plateau(lignes, colonnes):
     return np.zeros((lignes, colonnes), dtype=int)
 
+def create_board():
+    board = []
+    for i in range(6):
+        row = []
+        for j in range(7):
+            row.append(0)
+        board.append(row)
+    return board
 
 # Fonction pour afficher la grille de jeu
 def afficher_plateau(grille):
@@ -164,13 +299,17 @@ def evaluer_position(plateau, joueur):
     # Évaluation des diagonales ascendantes
     for ligne in range(len(plateau) - 3):
         for colonne in range(len(plateau[0]) - 3):
-            fenetre = np.array([plateau[ligne][colonne], plateau[ligne + 1][colonne + 1], plateau[ligne + 2][colonne + 2], plateau[ligne + 3][colonne + 3]])
+            fenetre = np.array(
+                [plateau[ligne][colonne], plateau[ligne + 1][colonne + 1], plateau[ligne + 2][colonne + 2],
+                 plateau[ligne + 3][colonne + 3]])
             score += eval_strategy.evaluate(strategy[currentPlayer - 1], fenetre, joueur)
 
     # Évaluation des diagonales descendantes
     for ligne in range(3, len(plateau)):
         for colonne in range(len(plateau[0]) - 3):
-            fenetre = np.array([plateau[ligne][colonne], plateau[ligne - 1][colonne + 1], plateau[ligne - 2][colonne + 2], plateau[ligne - 3][colonne + 3]])
+            fenetre = np.array(
+                [plateau[ligne][colonne], plateau[ligne - 1][colonne + 1], plateau[ligne - 2][colonne + 2],
+                 plateau[ligne - 3][colonne + 3]])
             score += eval_strategy.evaluate(strategy[currentPlayer - 1], fenetre, joueur)
 
     return score
@@ -183,6 +322,21 @@ def get_colonnes_valides(plateau):
         if plateau[0][colonne] == 0:
             colonnes_valides.append(colonne)
     return colonnes_valides
+
+
+def tryMove(plateau, move):
+    # Takes the current board and a possible move specified
+    # by the column. Returns the appropiate row where the
+    # piece and be located. If it's not found it returns -1.
+
+    if move < 0 or move > 7 or plateau[0][move] != 0:
+        return -1
+
+    for i in range(colonnes):
+        if plateau[i][move] != 0:
+            return i - 1
+
+    return -1
 
 
 ################################################## IA #############################################
@@ -248,6 +402,15 @@ def get_best_move(plateau, profondeur, joueur, algo):
     colonnes_valides = get_colonnes_valides(plateau)
     meilleur_score = float("-inf")
     meilleur_coup = colonnes_valides[0]
+
+    nouveau_plateau = plateau.copy()
+    placer_jeton(nouveau_plateau, random.randint(0, colonnes - 1), joueur)
+
+    node = Node(nouveau_plateau)
+    meilleur_coup = MTCS(3000, node, 2.0)
+
+    return meilleur_coup
+
     for colonne in colonnes_valides:
         nouveau_plateau = plateau.copy()
         placer_jeton(nouveau_plateau, colonne, joueur)
@@ -257,30 +420,23 @@ def get_best_move(plateau, profondeur, joueur, algo):
             case 2:
                 score = alphabeta(nouveau_plateau, profondeur, joueur)
             case 3:
-                root = Node(plateau.copy())
-                iterations = 1000
-                best_node = mcts(root.state, iterations)
-                print(best_node)
-                best_move = np.where(best_node.state[0] != plateau[0])[0][0]
+                print()
         if score > meilleur_score:
             meilleur_score = score
             meilleur_coup = colonne
     return meilleur_coup
 
-def make_move(plateau, colonne):
-    new_plateau = plateau.copy()
-    placer_jeton(new_plateau, colonne, currentPlayer)
-    return new_plateau
 
-def get_winner(plateau):
+def end_game(plateau):
     if verifie_victoire(plateau, 1):
-        return 1
+        return True
     elif verifie_victoire(plateau, 2):
-        return 2
+        return True
     elif grille_pleine(plateau):
-        return -1
+        return True
     else:
-        return 0
+        return False
+
 
 def grille_pleine(plateau):
     return np.all(plateau != 0)
@@ -360,8 +516,6 @@ def main():
     play([agent1, agent2], [layer1, layer2])
 
 
-
-
 # Stratégie - 0: Agressive |  1: Modérée |  2: Défensive
 # Premier paramètre
 # 0: Joueur
@@ -370,15 +524,6 @@ def main():
 # 3: MCTS
 # Deuxième paramètre = nombre de couche
 
-#main()
+# main()
 strategy = [1, 2]
 play([0, 3], [3, 1])
-
-
-
-
-
-
-
-
-
