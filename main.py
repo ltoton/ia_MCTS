@@ -354,7 +354,7 @@ def player_max(grid, depth, player, alpha=None, beta=None):
     for column in valid_columns:
         new_grid = grid.copy()
         place_token(new_grid, column, player)
-        score, _ = player_min(new_grid, depth - 1, 3 - player)
+        score, _ = player_min(new_grid, depth - 1, 3 - player, alpha, beta)
         if score > best_score:
             best_score = score
             action = column
@@ -377,7 +377,7 @@ def player_min(grid, depth, player, alpha=None, beta=None):
     for column in valid_columns:
         new_grid = grid.copy()
         place_token(new_grid, column, player)
-        score, _ = player_max(new_grid, depth - 1, 3 - player)
+        score, _ = player_max(new_grid, depth - 1, 3 - player, alpha, beta)
         if score < best_score:
             best_score = score
             action = column
@@ -472,6 +472,7 @@ def play(agents, layers, display):
             elif len(get_valid_columns(board)) == 0:
                 print("Match nul !")
                 end_game = True
+                winner = 1
             else:
                 player = 3 - player
                 currentPlayer = player
@@ -491,11 +492,11 @@ def main():
     layer2 = 0
 
     if agent1 == 1 or agent1 == 2:
-        layer1 = int(input("Profondeur IA 1 (entre 1 et 5): "))
+        layer1 = int(input("Profondeur IA 1: "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[0] = int(input("Stratégie IA 1: "))
     if agent2 == 1 or agent2 == 2:
-        layer2 = int(input("Profondeur IA 2 (entre 1 et 5): "))
+        layer2 = int(input("Profondeur IA 2: "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[1] = int(input("Stratégie IA 2: "))
 
@@ -503,6 +504,8 @@ def main():
         layer1 = int(input("Profondeur MCTS IA 1 (entre 500 et 20000): "))
     if agent2 == 3:
         layer2 = int(input("Profondeur MCTS IA 2 (entre 500 et 20000): "))
+
+    play([agent1, agent2], [layer1, layer2], True)
 
 
 # Stratégie - 0: Agressive |  1: Modérée |  2: Défensive
@@ -513,12 +516,12 @@ def main():
 # 3: MCTS
 # Deuxième paramètre = nombre de couche
 
-# main()
-strategy = [0, 2]
+main()
+strategy = [2, 2]
 time_infos = []
 winners = 0
-for i in range(1):
-    reponse, gagnant = play([1, 2], [2, 3], True)
+for i in range(10):
+    reponse, gagnant = play([1, 2], [4, 3], False)
     time_infos.append(reponse)
     if gagnant == 1:
         winners += 1
