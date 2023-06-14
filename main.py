@@ -18,6 +18,7 @@ class bcolors:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
+    OKBLUE = '\033[94m'
 
 
 ################################## MCTS ###############################################
@@ -199,15 +200,15 @@ def create_board():
 # Fonction pour afficher la grille de jeu
 def display_grid(grid):
     for lines in grid:
-        display_line = "|"
+        display_line = bcolors.OKBLUE + "|" + bcolors.ENDC
         for cells in lines:
             if cells == 1:
-                display_line += bcolors.WARNING + "X" + bcolors.ENDC
+                display_line += bcolors.WARNING + "O" + bcolors.ENDC
             elif cells == 2:
-                display_line += bcolors.FAIL + "0" + bcolors.ENDC
+                display_line += bcolors.FAIL + "O" + bcolors.ENDC
             else:
                 display_line += " "
-            display_line += "|"
+            display_line += bcolors.OKBLUE + "|" + bcolors.ENDC
         print(display_line)
     print("\n")
 
@@ -405,7 +406,9 @@ def get_best_move(grid, depth, player, algo):
 
 #################### Gestion affichage ############################
 def agent_name_from_index(playerNumber, agents, layers):
+    print("" + bcolors.WARNING if playerNumber == 1 else bcolors.FAIL)
     print("Joueur", playerNumber, ":")
+    print(bcolors.ENDC)
     playerNumber = playerNumber - 1
     agent = agents[playerNumber]
     match agent:
@@ -417,6 +420,7 @@ def agent_name_from_index(playerNumber, agents, layers):
             name = "Alpha-Beta"
         case 3:
             name = "MCTS"
+    name += bcolors.ENDC
     if (agent == 1 or agent == 2):
         name += " profondeur " + str(layers[playerNumber]) + " | Stratégie " + eval_strategy.get_strategy_name(
             strategy[playerNumber])
@@ -452,7 +456,9 @@ def play(agents, layers):
 
         if move:
             if check_victory(board, player):
+                print("" + bcolors.WARNING if player == 1 else bcolors.FAIL)
                 print("Joueur " + str(player) + " a gagné !")
+                print(bcolors.ENDC)
                 end_game = True
             elif len(get_valid_columns(board)) == 0:
                 print("Match nul !")
