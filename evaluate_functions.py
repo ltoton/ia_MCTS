@@ -59,10 +59,10 @@ def defensive(fenetre, joueur):
     if np.count_nonzero(fenetre == joueur) == 4:
         score += 1000
     elif np.count_nonzero(fenetre == joueur) == 3 and np.count_nonzero(fenetre == 0) == 1:
-        score += 5
+        score += 3
 
     if np.count_nonzero(fenetre == adversaire) == 2 and np.count_nonzero(fenetre == 0) == 2:
-        score -= 3
+        score -= 5
     if np.count_nonzero(fenetre == adversaire) == 3 and np.count_nonzero(fenetre == 0) == 1:
         score -= 100
 

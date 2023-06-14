@@ -332,12 +332,12 @@ def get_board(board):
 
 def minimax(grid, depth, player):
     score, action = player_max(grid, depth, player)
-    return score
+    return action
 
 
 def alphabeta(grid, depth, player):
     score, action = player_max(grid, depth, player, float("-inf"), float("inf"))
-    return score
+    return action
 
 
 def player_max(grid, depth, player, alpha=None, beta=None):
@@ -352,7 +352,7 @@ def player_max(grid, depth, player, alpha=None, beta=None):
     for column in valid_columns:
         new_grid = grid.copy()
         place_token(new_grid, column, player)
-        score, _ = player_min(grid, depth - 1, 3 - player)
+        score, _ = player_min(new_grid, depth - 1, 3 - player)
         if score > best_score:
             best_score = score
             action = column
@@ -375,7 +375,7 @@ def player_min(grid, depth, player, alpha=None, beta=None):
     for column in valid_columns:
         new_grid = grid.copy()
         place_token(new_grid, column, player)
-        score, _ = player_max(grid, depth - 1, 3 - player)
+        score, _ = player_max(new_grid, depth - 1, 3 - player)
         if score < best_score:
             best_score = score
             action = column
@@ -387,29 +387,19 @@ def player_min(grid, depth, player, alpha=None, beta=None):
     return best_score, action
 
 
-def get_mcts_move(grid, player):
+def get_mcts_move(grid, player, nbItr):
     node = Node(MCTSBoard(get_mcts_board(grid)))
-    best_coup = mcts(3000, node, 1 if player == 1 else -1)
+    best_coup = mcts(nbItr, node, 1 if player == 1 else -1)
     grid = get_board(best_coup.state.board)
     return grid
 
 
 def get_best_move(grid, depth, player, algo):
-    valid_columns = get_valid_columns(grid)
-    best_score = float("-inf")
-    best_coup = valid_columns[0]
-
-    for column in valid_columns:
-        new_grid = grid.copy()
-        place_token(new_grid, column, player)
-        match algo:
-            case 1:
-                score = minimax(new_grid, depth, player)
-            case 2:
-                score = alphabeta(new_grid, depth, player)
-        if score > best_score:
-            best_score = score
-            best_coup = column
+    match algo:
+        case 1:
+            best_coup = minimax(grid, depth, player)
+        case 2:
+            best_coup = alphabeta(grid, depth, player)
     return best_coup
 
 
@@ -454,7 +444,7 @@ def play(agents, layers):
                 column = get_best_move(board, layers[player - 1], player, agents[player - 1])
                 place_token(board, column, player)
             else:
-                board = get_mcts_move(board, player)
+                board = get_mcts_move(board, player, layers[player - 1])
             move = True
 
         print(agent_name_from_index(player, agents, layers))
@@ -485,13 +475,18 @@ def main():
     layer2 = 0
 
     if agent1 == 1 or agent1 == 2:
-        layer1 = int(input("Profondeur IA 1: "))
+        layer1 = int(input("Profondeur IA 1 (entre 1 et 5): "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[0] = int(input("Stratégie IA 1: "))
     if agent2 == 1 or agent2 == 2:
-        layer2 = int(input("Profondeur IA 2: "))
+        layer2 = int(input("Profondeur IA 2 (entre 1 et 5): "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[1] = int(input("Stratégie IA 2: "))
+
+    if agent1 == 3:
+        layer1 = int(input("Profondeur MCTS IA 1 (entre 500 et 20000): "))
+    if agent2 == 3:
+        layer2 = int(input("Profondeur MCTS IA 2 (entre 500 et 20000): "))
 
     play([agent1, agent2], [layer1, layer2])
 
@@ -504,6 +499,6 @@ def main():
 # 3: MCTS
 # Deuxième paramètre = nombre de couche
 
-#main()
-strategy = [2, 2]
-play([2, 3], [3, 1])
+main()
+#strategy = [2, 2]
+#play([2, 3], [3, 1])
