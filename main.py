@@ -10,16 +10,19 @@ lignes = 6
 colonnes = 7
 strategy = [0, 0]
 currentPlayer = 1
+
+
 #####################
-
-dx = [1, 1, 1, 0]
-dy = [1, 0, -1, 1]
-
 
 class bcolors:
     WARNING = '\033[93m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
+
+
+################################## MCTS ###############################################
+dx = [1, 1, 1, 0]
+dy = [1, 0, -1, 1]
 
 
 class Board(object):
@@ -29,10 +32,6 @@ class Board(object):
         self.last_move = last_move
 
     def tryMove(self, move):
-        # Takes the current board and a possible move specified
-        # by the column. Returns the appropiate row where the
-        # piece and be located. If it's not found it returns -1.
-
         if (move < 0 or move > 7 or self.board[0][move] != 0):
             return -1;
 
@@ -42,14 +41,12 @@ class Board(object):
         return len(self.board) - 1
 
     def terminal(self):
-        # Returns true when the game is finished, otherwise false.
         for i in range(len(self.board[0])):
             if (self.board[0][i] == 0):
                 return False
         return True
 
     def legal_moves(self):
-        # Returns the full list of legal moves that for next player.
         legal = []
         for i in range(len(self.board[0])):
             if (self.board[0][i] == 0):
@@ -58,7 +55,6 @@ class Board(object):
         return legal
 
     def next_state(self, turn):
-        # Retuns next state
         aux = copy.deepcopy(self)
         moves = aux.legal_moves()
         if len(moves) > 0:
@@ -69,10 +65,6 @@ class Board(object):
         return aux
 
     def winner(self):
-        # Takes the board as input and determines if there is a winner.
-        # If the game has a winner, it returns the player number (Computer = 1, Human = -1).
-        # If the game is still ongoing, it returns zero.
-
         x = self.last_move[0]
         y = self.last_move[1]
 
@@ -115,7 +107,6 @@ class Board(object):
 
 
 class Node():
-    # Data structure to keep track of our search
     def __init__(self, state, parent=None):
         self.visits = 1
         self.reward = 0.0
@@ -139,20 +130,19 @@ class Node():
         return False
 
 
-def MTCS(maxIter, root, factor):
+def MTCS(maxIter, root, factor, player):
     for inter in range(maxIter):
-        front, turn = treePolicy(root, 1, factor)
+        front, turn = treePolicy(root, player, factor)
         reward = defaultPolicy(front.state, turn)
         backup(front, reward, turn)
 
     ans = bestChild(root, 0)
-    # print [(c.reward/c.visits) for c in ans.parent.children ]
     return ans
 
 
 def treePolicy(node, turn, factor):
     while node.state.terminal() == False and node.state.winner() == 0:
-        if (node.fully_explored() == False):
+        if node.fully_explored() == False:
             return expand(node, turn), -turn
         else:
             node = bestChild(node, factor)
@@ -199,7 +189,7 @@ def defaultPolicy(state, turn):
 
 
 def backup(node, reward, turn):
-    while node != None:
+    while node is not None:
         node.visits += 1
         node.reward -= turn * reward
         node = node.parent
@@ -207,11 +197,12 @@ def backup(node, reward, turn):
     return
 
 
-################ Gestion du jeu ##################
+######################################## Gestion du jeu ###############################################
 
 # Fonction pour créer le plateau de jeu vide
-def creer_plateau(lignes, colonnes):
+def creer_plateau():
     return np.zeros((lignes, colonnes), dtype=int)
+
 
 def create_board():
     board = []
@@ -221,6 +212,7 @@ def create_board():
             row.append(0)
         board.append(row)
     return board
+
 
 # Fonction pour afficher la grille de jeu
 def afficher_plateau(grille):
@@ -324,22 +316,37 @@ def get_colonnes_valides(plateau):
     return colonnes_valides
 
 
-def tryMove(plateau, move):
-    # Takes the current board and a possible move specified
-    # by the column. Returns the appropiate row where the
-    # piece and be located. If it's not found it returns -1.
+def get_board(plateau):
+    board = []
+    for i in range(6):
+        row = []
+        for j in range(7):
+            if plateau[i][j] == 0:
+                row.append(0)
+            if plateau[i][j] == 1:
+                row.append(1)
+            if plateau[i][j] == 2:
+                row.append(-1)
+        board.append(row)
+    return board
 
-    if move < 0 or move > 7 or plateau[0][move] != 0:
-        return -1
 
-    for i in range(colonnes):
-        if plateau[i][move] != 0:
-            return i - 1
+def get_plateau(board):
+    plateau = []
+    for i in range(6):
+        row = []
+        for j in range(7):
+            if board[i][j] == 0:
+                row.append(0)
+            if board[i][j] == 1:
+                row.append(1)
+            if board[i][j] == -1:
+                row.append(2)
+        plateau.append(np.asarray(row))
+    return np.asarray(plateau)
 
-    return -1
 
-
-################################################## IA #############################################
+################################################## MINIMAX & ALPHABETA #############################################
 
 def minimax(plateau, profondeur, joueur):
     score, action = joueur_max(plateau, profondeur, joueur)
@@ -398,18 +405,17 @@ def joueur_min(plateau, profondeur, joueur, alpha=None, beta=None):
     return best_score, action
 
 
+def get_mcts_move(plateau, joueur):
+    node = Node(Board(get_board(plateau)))
+    meilleur_coup = MTCS(3000, node, 2.0, 1 if joueur == 1 else -1)
+    plateau = get_plateau(meilleur_coup.state.board)
+    return plateau
+
+
 def get_best_move(plateau, profondeur, joueur, algo):
     colonnes_valides = get_colonnes_valides(plateau)
     meilleur_score = float("-inf")
     meilleur_coup = colonnes_valides[0]
-
-    nouveau_plateau = plateau.copy()
-    placer_jeton(nouveau_plateau, random.randint(0, colonnes - 1), joueur)
-
-    node = Node(nouveau_plateau)
-    meilleur_coup = MTCS(3000, node, 2.0)
-
-    return meilleur_coup
 
     for colonne in colonnes_valides:
         nouveau_plateau = plateau.copy()
@@ -419,8 +425,6 @@ def get_best_move(plateau, profondeur, joueur, algo):
                 score = minimax(nouveau_plateau, profondeur, joueur)
             case 2:
                 score = alphabeta(nouveau_plateau, profondeur, joueur)
-            case 3:
-                print()
         if score > meilleur_score:
             meilleur_score = score
             meilleur_coup = colonne
@@ -456,7 +460,7 @@ def agentNameFromIndex(playerNumber, agents, layers):
             name = "Alpha-Beta"
         case 3:
             name = "MCTS"
-    if (agent == 1 or agent == 2 or agent == 3):
+    if (agent == 1 or agent == 2):
         name += " profondeur " + str(layers[playerNumber]) + " | Stratégie " + eval_strategy.get_strategy_name(
             strategy[playerNumber])
 
@@ -464,32 +468,39 @@ def agentNameFromIndex(playerNumber, agents, layers):
 
 
 def play(agents, layers):
-    plateau = creer_plateau(lignes, colonnes)
+    plateau = creer_plateau()
     global currentPlayer
-    joueur = 1
+    player = 1
     fin_partie = False
 
     while not fin_partie:
-        print(agentNameFromIndex(joueur, agents, layers))
+        if agents[player - 1] == 0:
+            colonne = int(input("Joueur " + str(player) + ", choisissez une colonne : ")) - 1
+            if not placer_jeton(plateau, colonne, player):
+                move = False
+            else:
+                move = True
+        else:
+            if agents[player - 1] == 1 or agents[player - 1] == 2:
+                colonne = get_best_move(plateau, layers[player - 1], player, agents[player - 1])
+                placer_jeton(plateau, colonne, player)
+            else:
+                plateau = get_mcts_move(plateau, player)
+            move = True
+
+        print(agentNameFromIndex(player, agents, layers))
         afficher_plateau(plateau)
 
-        if agents[joueur - 1] == 0:
-            colonne = int(input("Joueur " + str(joueur) + ", choisissez une colonne : ")) - 1
-        else:
-            colonne = get_best_move(plateau, layers[joueur - 1], joueur, agents[joueur - 1])
-
-        if placer_jeton(plateau, colonne, joueur):
-            if verifie_victoire(plateau, joueur):
-                afficher_plateau(plateau)
-                print("Joueur " + str(joueur) + " a gagné !")
+        if move:
+            if verifie_victoire(plateau, player):
+                print("Joueur " + str(player) + " a gagné !")
                 fin_partie = True
             elif len(get_colonnes_valides(plateau)) == 0:
-                afficher_plateau(plateau)
                 print("Match nul !")
                 fin_partie = True
             else:
-                joueur = 3 - joueur
-                currentPlayer = joueur
+                player = 3 - player
+                currentPlayer = player
         else:
             print("La colonne est pleine. Veuillez choisir une autre colonne.")
 
@@ -504,11 +515,11 @@ def main():
     layer1 = 0
     layer2 = 0
 
-    if agent1 == 1 or agent1 == 2 or agent1 == 3:
+    if agent1 == 1 or agent1 == 2:
         layer1 = int(input("Profondeur IA 1: "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[0] = int(input("Stratégie IA 1: "))
-    if agent2 == 1 or agent2 == 2 or agent2 == 3:
+    if agent2 == 1 or agent2 == 2:
         layer2 = int(input("Profondeur IA 2: "))
         print("0: Agressive |  1: Modérée |  2: Défensive")
         strategy[1] = int(input("Stratégie IA 2: "))
@@ -525,5 +536,5 @@ def main():
 # Deuxième paramètre = nombre de couche
 
 # main()
-strategy = [1, 2]
+strategy = [2, 2]
 play([0, 3], [3, 1])
